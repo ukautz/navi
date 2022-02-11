@@ -27,18 +27,28 @@ fn paths_from_path_param(env_var: &str) -> impl Iterator<Item = &str> {
 }
 
 pub fn default_cheat_pathbuf() -> Result<PathBuf> {
-    let base_dirs = BaseDirs::new().ok_or_else(|| anyhow!("Unable to get base dirs"))?;
+    let mut pathbuf = match option_env!("NAVI_DATA_BASE_DIR") {
+        Some(data_dir) => PathBuf::from(data_dir),
+        None => {
+            let base_dir = BaseDirs::new().ok_or_else(|| anyhow!("Unable to get base dirs"))?;
+            base_dir.data_dir().to_path_buf()
+        }
+    };
 
-    let mut pathbuf = PathBuf::from(base_dirs.data_dir());
     pathbuf.push("navi");
     pathbuf.push("cheats");
     Ok(pathbuf)
 }
 
 pub fn default_config_pathbuf() -> Result<PathBuf> {
-    let base_dirs = BaseDirs::new().ok_or_else(|| anyhow!("Unable to get base dirs"))?;
+    let mut pathbuf = match option_env!("NAVI_CONFIG_BASE_DIR") {
+        Some(data_dir) => PathBuf::from(data_dir),
+        None => {
+            let base_dir = BaseDirs::new().ok_or_else(|| anyhow!("Unable to get base dirs"))?;
+            base_dir.config_dir().to_path_buf()
+        }
+    };
 
-    let mut pathbuf = PathBuf::from(base_dirs.config_dir());
     pathbuf.push("navi");
     pathbuf.push("config.yaml");
     Ok(pathbuf)
@@ -189,6 +199,9 @@ impl fetcher::Fetcher for Fetcher {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "test-override-navi-base-dirs")]
+    use std::env;
+
     use super::*;
 
     /* TODO
@@ -246,5 +259,71 @@ mod tests {
             let expected = expected_paths.next().unwrap();
             assert_eq!(found, expected)
         }
+    }
+
+    #[test]
+    #[cfg(not(feature = "test-override-navi-base-dirs"))]
+    fn test_default_config_pathbuf() {
+        let base_dirs = BaseDirs::new()
+            .ok_or(anyhow!("bad"))
+            .expect("could not determine base directories");
+        let mut expect = base_dirs.config_dir().to_path_buf();
+        expect.push("navi");
+        expect.push("config.yaml");
+        let config = default_config_pathbuf().expect("could not find default config path");
+
+        assert_eq!(expect.to_string_lossy(), config.to_string_lossy())
+    }
+
+    #[test]
+    #[cfg(not(feature = "test-override-navi-base-dirs"))]
+    fn test_default_cheat_pathbuf() {
+        let base_dirs = BaseDirs::new()
+            .ok_or(anyhow!("bad"))
+            .expect("could not determine base directories");
+        let mut expect = base_dirs.data_dir().to_path_buf();
+        expect.push("navi");
+        expect.push("cheats");
+        let cheats = default_cheat_pathbuf().expect("could not find default cheat path");
+
+        assert_eq!(expect.to_string_lossy(), cheats.to_string_lossy())
+    }
+
+    #[test]
+    #[cfg(feature = "test-override-navi-base-dirs")]
+    fn test_navi_data_base_dir_env_is_set() {
+        let val = env!("NAVI_DATA_BASE_DIR");
+        assert_ne!(val, "");
+    }
+
+    #[test]
+    #[cfg(feature = "test-override-navi-base-dirs")]
+    fn test_navi_config_base_dir_env_is_set() {
+        let val = env!("NAVI_CONFIG_BASE_DIR");
+        assert_ne!(val, "");
+    }
+
+    #[test]
+    #[cfg(feature = "test-override-navi-base-dirs")]
+    fn test_default_config_pathbuf() {
+        let env_value = env::var("NAVI_CONFIG_BASE_DIR").expect("missing expected env var");
+        let expect = vec![env_value.as_str(), "navi", "config.yaml"]
+            .iter()
+            .collect::<PathBuf>();
+        let config = default_config_pathbuf().expect("could not find default config path");
+
+        assert_eq!(expect.to_string_lossy(), config.to_string_lossy())
+    }
+
+    #[test]
+    #[cfg(feature = "test-override-navi-base-dirs")]
+    fn test_default_cheats_pathbuf() {
+        let env_value = env::var("NAVI_DATA_BASE_DIR").expect("missing expected env var");
+        let expect = vec![env_value.as_str(), "navi", "cheats"]
+            .iter()
+            .collect::<PathBuf>();
+        let cheats = default_cheat_pathbuf().expect("could not find default cheats path");
+
+        assert_eq!(expect.to_string_lossy(), cheats.to_string_lossy())
     }
 }

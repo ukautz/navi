@@ -43,6 +43,16 @@ jobs:
           toolchain: stable
           override: true
 
+      - name: Run cargo test with env var overrides
+        uses: actions-rs/cargo@v1
+        continue-on-error: false
+        env:
+          NAVI_CONFIG_BASE_DIR: /something/config
+          NAVI_DATA_BASE_DIR: /something/data
+        with:
+          command: test
+          args: --features test-override-navi-base-dirs
+
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         continue-on-error: false
